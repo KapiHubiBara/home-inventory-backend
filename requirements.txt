@@ -4,3 +4,6 @@ motor
 pydantic
 python-dotenv
 httpx
+pyjwt
+passlib[bcrypt]
+bcrypt==4.0.1
