@@ -56,8 +56,10 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
 
 async def get_current_user(authorization: Optional[str] = Header(None)) -> str:
     if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
-                            detail="Brak lub nieprawidłowy token autoryzacyjny")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Brak lub nieprawidłowy token autoryzacyjny"
+        )
     token = authorization.split(" ")[1]
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
@@ -75,6 +77,13 @@ async def get_current_user(authorization: Optional[str] = Header(None)) -> str:
 class UserAuthSchema(BaseModel):
     username: str
     password: str
+    pin: Optional[str] = None  # PIN ratunkowy (np. 4 cyfry)
+
+
+class ResetPasswordSchema(BaseModel):
+    username: str
+    pin: str
+    new_password: str
 
 
 class ItemSchema(BaseModel):
@@ -118,6 +127,9 @@ async def register(payload: UserAuthSchema):
     if len(username) < 3 or len(payload.password) < 4:
         raise HTTPException(status_code=400, detail="Nazwa użytkownika min. 3 znaki, hasło min. 4 znaki.")
 
+    if not payload.pin or len(str(payload.pin).strip()) < 4:
+        raise HTTPException(status_code=400, detail="PIN ratunkowy musi mieć minimum 4 cyfry.")
+
     existing_user = await db.users.find_one({"username": username})
     if existing_user:
         raise HTTPException(status_code=400, detail="Użytkownik o takiej nazwie już istnieje.")
@@ -125,6 +137,7 @@ async def register(payload: UserAuthSchema):
     user_doc = {
         "username": username,
         "password_hash": hash_password(payload.password),
+        "pin": str(payload.pin).strip(),
         "created_at": datetime.utcnow().isoformat()
     }
     await db.users.insert_one(user_doc)
@@ -141,6 +154,34 @@ async def login(payload: UserAuthSchema):
 
     token = create_access_token(data={"sub": username})
     return {"token": token, "username": username}
+
+
+@app.post("/auth/reset-password")
+async def reset_password(payload: ResetPasswordSchema):
+    username = payload.username.strip().lower()
+    user = await db.users.find_one({"username": username})
+
+    if not user:
+        raise HTTPException(status_code=404, detail="Nie znaleziono użytkownika o takiej nazwie.")
+
+    saved_pin = str(user.get("pin", "")).strip()
+    provided_pin = str(payload.pin).strip()
+
+    if not saved_pin:
+        raise HTTPException(status_code=400, detail="To konto nie posiada skonfigurowanego PIN-u ratunkowego.")
+
+    if saved_pin != provided_pin:
+        raise HTTPException(status_code=401, detail="Błędny PIN ratunkowy.")
+
+    if len(payload.new_password) < 4:
+        raise HTTPException(status_code=400, detail="Nowe hasło musi mieć minimum 4 znaki.")
+
+    new_hash = hash_password(payload.new_password)
+    await db.users.update_one(
+        {"username": username},
+        {"$set": {"password_hash": new_hash}}
+    )
+    return {"message": "Hasło zostało pomyślnie zaktualizowane."}
 
 
 # ==========================================
