@@ -100,6 +100,10 @@ class ItemSchema(BaseModel):
     image_url: Optional[str] = Field(None)
 
 
+class BatchItemsSchema(BaseModel):
+    items: List[ItemSchema]
+
+
 class DeductSchema(BaseModel):
     amount: float = Field(..., gt=0.0)
 
@@ -116,6 +120,7 @@ class MapPayload(BaseModel):
     spotsDefs: Optional[Dict[str, Any]] = {}
     themeMode: Optional[str] = "light"
     inventoryViewMode: Optional[str] = "list"
+
 
 # ==========================================
 # 4. ENDPOINTY AUTORYZACJI
@@ -247,6 +252,22 @@ async def add_item(item: ItemSchema, username: str = Depends(get_current_user)):
     doc["id"] = str(result.inserted_id)
     del doc["_id"]
     return {"message": "Dodano pomyślnie", "item": doc}
+
+
+@app.post("/items/batch", status_code=status.HTTP_201_CREATED)
+async def add_items_batch(payload: BatchItemsSchema, username: str = Depends(get_current_user)):
+    if not payload.items:
+        raise HTTPException(status_code=400, detail="Lista przedmiotów jest pusta.")
+
+    docs = []
+    for item in payload.items:
+        doc = item.model_dump()
+        doc["owner"] = username
+        doc["created_at"] = datetime.utcnow().isoformat()
+        docs.append(doc)
+
+    result = await db.items.insert_many(docs)
+    return {"message": f"Pomyślnie zaimportowano {len(result.inserted_ids)} przedmiotów."}
 
 
 @app.patch("/items/{name}/deduct")
