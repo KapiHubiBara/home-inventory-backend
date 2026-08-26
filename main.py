@@ -77,7 +77,7 @@ async def get_current_user(authorization: Optional[str] = Header(None)) -> str:
 class UserAuthSchema(BaseModel):
     username: str
     password: str
-    pin: Optional[str] = None  # PIN ratunkowy (np. 4 cyfry)
+    pin: Optional[str] = None
 
 
 class ResetPasswordSchema(BaseModel):
@@ -105,13 +105,17 @@ class DeductSchema(BaseModel):
 
 
 class MapPayload(BaseModel):
-    gridRows: int
-    gridCols: int
-    gridCells: Dict[str, Any]
-    roomDefs: List[Any]
+    gridRows: Optional[int] = 10
+    gridCols: Optional[int] = 16
+    gridCells: Optional[Dict[str, Any]] = {}
+    roomDefs: Optional[List[Any]] = []
+    subGridRowsMap: Optional[Dict[str, Any]] = {}
+    subGridColsMap: Optional[Dict[str, Any]] = {}
+    subGridDefs: Optional[Dict[str, Any]] = {}
+    subGridCells: Optional[Dict[str, Any]] = {}
+    spotsDefs: Optional[Dict[str, Any]] = {}
     themeMode: Optional[str] = "light"
     inventoryViewMode: Optional[str] = "list"
-
 
 # ==========================================
 # 4. ENDPOINTY AUTORYZACJI
@@ -185,7 +189,7 @@ async def reset_password(payload: ResetPasswordSchema):
 
 
 # ==========================================
-# 5. ENDPOINTY PRODUKTÓW & MAPY (ZABEZPIECZONE)
+# 5. ENDPOINTY PRODUKTÓW & MAPY
 # ==========================================
 @app.get("/barcode/{ean}")
 async def fetch_product_by_barcode(ean: str):
@@ -295,19 +299,19 @@ async def delete_item(item_id: str, username: str = Depends(get_current_user)):
 async def get_map_config(username: str = Depends(get_current_user)):
     config = await db.map_config.find_one({"_id": f"layout_{username}"})
     if not config:
-        return {"error": "Not found"}
+        return {}
     config["id"] = str(config["_id"])
     return config
 
 
 @app.post("/map-config")
 async def save_map_config(payload: MapPayload, username: str = Depends(get_current_user)):
-    data = payload.dict()
+    data = payload.model_dump() if hasattr(payload, "model_dump") else payload.dict()
     data["_id"] = f"layout_{username}"
     data["owner"] = username
-    await db.map_config.update_one(
+    await db.map_config.replace_one(
         {"_id": f"layout_{username}"},
-        {"$set": data},
+        data,
         upsert=True
     )
     return {"status": "saved"}
