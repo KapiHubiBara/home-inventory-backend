@@ -1,3 +1,5 @@
+> 🔗 **Frontend Web / Mobile:** [home-inventory-app](https://github.com/KapiHubiBara/home-inventory-app)  
+> 🚀 **Działająca aplikacja (Live Demo):** [stashbrain-s53a.vercel.app](https://stashbrain-s53a.vercel.app)
 # StashBrain – Backend API
 
 Asynchroniczne REST API wspierające system inwentaryzacji domowej w formie aplikacji o nazwie **StashBrain**. Serwis obsługuje autoryzację wielodostępną, mapowanie pomieszczeń na interaktywnej siatce dwuwymiarowej, śledzenie poziomów zużycia zapasów oraz integrację z bazą kodów kreskowych Open Food Facts. Aplikacja powstała z myślą pomocy ogarnięcia jedynego bajzlu w moim życiu, czyli pokoju :D
